@@ -73,11 +73,7 @@
 ```bash
 mkdir -p /workspace/models && cd /workspace/models
 
-# [แนะนำ] regular Q8_0
-wget https://huggingface.co/DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF/resolve/main/Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-Q8_0.gguf
-
-# [ทางเลือก] MTP Q8_0 (ชื่อตามที่ยืนยันว่าโหลดได้จริง)
-# wget https://huggingface.co/DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF/resolve/main/Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-MTP-Q8_0.gguf
+# wget (ตามด้วย link model .gguf)
 ```
 
 > ⚠️ ถ้า regular ขึ้น `404 Not Found` แปลว่าชื่อไฟล์จริงต่างนิดหน่อย →
@@ -87,30 +83,6 @@ wget https://huggingface.co/DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Here
 **เช็กว่าโหลดครบ:**
 ```bash
 ls -lh /workspace/models/*.gguf   # ต้องเห็น ~30.2 GB
-```
-
-> เน็ตหลุดกลางทาง? รัน `wget` ซ้ำเติม `-c` เพื่อ resume: `wget -c <url>`
-
-### 1.2 ทางเลือก: `hf` (ชื่อใหม่ของ huggingface-cli)
-
-```bash
-hf download DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF \
-  Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-Q8_0.gguf \
-  --local-dir /workspace/models
-```
-> หมายเหตุ: `huggingface-cli` ถูกเลิกใช้แล้วในเวอร์ชันใหม่ → ใช้ `hf` แทน
-
-### 1.3 Fallback: Python ตรง ๆ
-
-```bash
-python -c "
-from huggingface_hub import hf_hub_download
-hf_hub_download(
-  repo_id='DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF',
-  filename='Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-Q8_0.gguf',
-  local_dir='/workspace/models'
-)
-"
 ```
 
 ---
@@ -143,7 +115,7 @@ cmake --build build --config Release -j$(nproc)
 cd /workspace/llama.cpp
 
 ./build/bin/llama-server \
-  -m /workspace/models/Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-Q8_0.gguf \
+  -m /workspace/models/ชื่อmodel ที่โหลดมา \
   --host 0.0.0.0 \
   --port 8080 \
   -ngl 99 \
