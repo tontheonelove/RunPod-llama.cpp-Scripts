@@ -241,7 +241,6 @@ open-webui serve --host 0.0.0.0 --port 7860
 
 ## 🔗 ลิงก์อ้างอิง
 
-- โมเดล: <https://huggingface.co/DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF>
 - llama.cpp: <https://github.com/ggml-org/llama.cpp>
 - llama.cpp releases (prebuilt): <https://github.com/ggml-org/llama.cpp/releases>
 - Open WebUI: <https://github.com/open-webui/open-webui>
