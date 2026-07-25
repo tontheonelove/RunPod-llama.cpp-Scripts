@@ -1,8 +1,7 @@
-# 🦙 รัน Qwen3.6-27B-Fable-Fusion (GGUF) บน RunPod ด้วย llama.cpp + Web Chat
+# 🦙 รัน Model (GGUF) บน RunPod ด้วย llama.cpp + Web Chat
 
 คู่มือแบบทีละขั้นตอน สำหรับรันโมเดล
-**`DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF`**
-(quant `Q8_0` ~30 GB) บน **RunPod** โดยใช้ **llama.cpp** เป็น inference engine
+บน **RunPod** โดยใช้ **llama.cpp** เป็น inference engine
 และเปิด **หน้าเว็บสำหรับแชททดสอบ** (ทั้ง UI ในตัวของ llama-server และ Open WebUI)
 
 ---
@@ -22,10 +21,6 @@
 ---
 
 ## 🧭 ภาพรวม & ทำไมต้อง llama.cpp
-
-โมเดลตัวนี้มี architecture เป็น **`qwen35`** (Qwen3.5/3.6 hybrid = *Gated DeltaNet*
-linear-attention + Gated Attention) **ไม่ใช่** Qwen3 ปกติ ทำให้ engine เก่า ๆ
-โหลดไม่ขึ้น
 
 | Engine | สถานะกับโมเดลนี้ | หมายเหตุ |
 |---|---|---|
