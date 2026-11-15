@@ -1,42 +1,43 @@
 #!/usr/bin/env bash
-# RunPod — Gemma 4 31B it ARA-heretic Q6_K | shares binary/cache with Q8 instance
+# Standalone — RunPod | Gemma 4 31B it ARA-heretic Q6_K (25.2 GB)
+# https://huggingface.co/mradermacher/gemma-4-31B-it-ARA-heretic-GGUF
+# usage: bash run-q6.sh [start|stop|restart|status|log|bench|update]
 set -uo pipefail
 if [ -f "$0" ] && grep -q $'\r' "$0" 2>/dev/null; then sed -i 's/\r$//' "$0"; exec bash "$0" "$@"; fi
 
 ######################## CONFIG ########################
 WS="${WS:-/workspace}"
-PORT="${PORT:-8001}"           # 8001 -> run alongside Q8 (8000)
-CTX="${CTX:-65536}"            # total; per-request = CTX / PARALLEL
-PARALLEL="${PARALLEL:-4}"      # 4 slots -> 16384 ctx each
+PORT="${PORT:-8000}"
+CTX="${CTX:-32768}"            # total; per-request = CTX / PARALLEL
+PARALLEL="${PARALLEL:-4}"      # 4 slots -> 8192 ctx each
 NGL="${NGL:-99}"
 BATCH="${BATCH:-4096}"; UBATCH="${UBATCH:-1024}"
 MODEL_REPO="${MODEL_REPO:-mradermacher/gemma-4-31B-it-ARA-heretic-GGUF}"
 MODEL_FILE="${MODEL_FILE:-gemma-4-31B-it-ARA-heretic.Q6_K.gguf}"
-MTP="${MTP:-1}"
+MTP="${MTP:-1}"                # speculative decoding ~1.4x, auto-fallback
 DRAFT_MAX="${DRAFT_MAX:-8}"; DRAFT_P_MIN="${DRAFT_P_MIN:-0.6}"
-MMPROJ="${MMPROJ:-0}"
+MMPROJ="${MMPROJ:-0}"          # 1 = vision (+810MB)
 THINKING="${THINKING:-0}"
-KV_Q="${KV_Q:-}"
+KV_Q="${KV_Q:-}"               # "q8_0" = ประหยัด KV cache
 CACHE_REUSE="${CACHE_REUSE:-0}"
 TEMP="${TEMP:-1.0}"; TOP_P="${TOP_P:-0.95}"; TOP_K="${TOP_K:-64}"
 SPLIT_MODE="${SPLIT_MODE:-}"; TENSOR_SPLIT="${TENSOR_SPLIT:-}"
 HF_TOKEN="${HF_TOKEN:-}"; BIN_URL="${BIN_URL:-}"; FORCE_BUILD="${FORCE_BUILD:-0}"
 ########################################################
 
-BIN_DIR="$WS/bin"; BIN="$BIN_DIR/llama-server"      # shared with Q8
+BIN_DIR="$WS/bin"; BIN="$BIN_DIR/llama-server"
 MODEL="$WS/models/$MODEL_FILE"; BASE="${MODEL_FILE%%.*}"
 MM_FILE="${BASE}.mmproj-Q8_0.gguf"; MM_PATH="$WS/models/$MM_FILE"
 DRAFT_REPO="unsloth/gemma-4-31B-it-GGUF"
 DRAFT_FILE="MTP/mtp-gemma-4-31B-it-Q8_0.gguf"
 DRAFT_PATH="$WS/models/mtp-gemma-4-31B-it-Q8_0.gguf"
-LOG="$WS/logs/server-q6.log"
-PROC="llama-server.*--port $PORT"                   # port-scoped process match
+LOG="$WS/logs/server.log"
 export HF_HOME="$WS/hf" CCACHE_DIR="$WS/.ccache" DEBIAN_FRONTEND=noninteractive
 export LD_LIBRARY_PATH="$BIN_DIR:${LD_LIBRARY_PATH:-}"
 mkdir -p "$WS/models" "$BIN_DIR" "$WS/logs" "$WS/hf" "$WS/.ccache" "$WS/kv"
 
 c(){ printf '\033[1;%sm%s\033[0m\n' "$1" "$2"; }
-say(){ c 35 "==> [Q6_K] $*"; }; ok(){ c 32 "  ✓ $*"; }
+say(){ c 36 "==> $*"; }; ok(){ c 32 "  ✓ $*"; }
 warn(){ c 33 "  ! $*"; }; die(){ c 31 "  ✗ $*"; exit 1; }
 
 hf_get(){ # repo file dest
@@ -50,7 +51,7 @@ hf_get(){ # repo file dest
 
 ensure_bin(){
   say "llama-server binary"
-  if [ -x "$BIN" ] && [ "$FORCE_BUILD" != "1" ]; then ok "shared binary reused (no compile)"; return; fi
+  if [ -x "$BIN" ] && [ "$FORCE_BUILD" != "1" ]; then ok "cached (no compile)"; return; fi
   if [ "$FORCE_BUILD" != "1" ]; then
     if [ -n "$BIN_URL" ]; then
       command -v unzip >/dev/null || { apt-get update -qq; apt-get install -y -qq unzip; }
@@ -68,7 +69,7 @@ ensure_bin(){
       ok "reused image binary (no compile)"; return
     fi
   fi
-  say "building latest llama.cpp (ONE TIME, shared cache)"
+  say "building latest llama.cpp (ONE TIME, cached to $BIN)"
   apt-get update -qq
   apt-get install -y -qq git cmake ninja-build ccache build-essential libcurl4-openssl-dev ca-certificates
   command -v nvcc >/dev/null || die "nvcc missing -> use CUDA devel image"
@@ -104,7 +105,7 @@ build_args(){
   has '--ubatch-size'   && A+=(-ub "$UBATCH")
   has '--parallel'      && A+=(--parallel "$PARALLEL")
   has '--cont-batching' && A+=(--cont-batching)
-  has '--slot-save-path' && A+=(--slot-save-path "$WS/kv/q6")
+  has '--slot-save-path' && A+=(--slot-save-path "$WS/kv")
   [ "$CACHE_REUSE" != "0" ] && has '--cache-reuse' && A+=(--cache-reuse "$CACHE_REUSE")
   [ -n "$KV_Q" ] && has '--cache-type-k' && A+=(--cache-type-k "$KV_Q" --cache-type-v "$KV_Q")
   [ -n "$SPLIT_MODE" ] && has '--split-mode' && A+=(--split-mode "$SPLIT_MODE")
@@ -126,25 +127,24 @@ build_args(){
 }
 
 launch(){
-  mkdir -p "$(dirname "$LOG")"
   nohup "$BIN" "$@" > "$LOG" 2>&1 &
   local i
   for i in $(seq 1 300); do
     curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 && return 0
-    pgrep -f "$PROC" >/dev/null || return 1
+    pgrep -f llama-server >/dev/null || return 1
     sleep 2
   done
   return 1
 }
 
 start_server(){
-  say "launch | port $PORT | ctx $CTX / $PARALLEL slots | ubatch $UBATCH"
-  pkill -f "$PROC" 2>/dev/null; sleep 2
+  say "launch Q6_K | port $PORT | ctx $CTX / $PARALLEL slots"
+  pkill -f llama-server 2>/dev/null; sleep 2
   build_args
   if [ ${#D[@]} -gt 0 ]; then
     launch "${A[@]}" "${D[@]}" && { ok "READY (MTP)"; return; }
     warn "MTP failed -> fallback to normal decoding"; tail -n 12 "$LOG"
-    pkill -f "$PROC" 2>/dev/null; sleep 2
+    pkill -f llama-server 2>/dev/null; sleep 2
   fi
   if ! launch "${A[@]}"; then
     tail -n 40 "$LOG"
@@ -156,7 +156,7 @@ start_server(){
 
 info(){
   echo; c 32 "──────────────────────────────────────────────"
-  c 32 " Q6_K API : http://127.0.0.1:$PORT/v1"
+  c 32 " API : http://127.0.0.1:$PORT/v1"
   [ -n "${RUNPOD_POD_ID:-}" ] && c 32 " URL : https://${RUNPOD_POD_ID}-${PORT}.proxy.runpod.net/v1"
   c 32 "──────────────────────────────────────────────"
   nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader
@@ -191,9 +191,9 @@ case "${1:-start}" in
     [ "$MTP" = "1" ] && hf_get "$DRAFT_REPO" "$DRAFT_FILE" "$DRAFT_PATH"
     start_server; info ;;
   update)  rm -rf "$BIN_DIR"; mkdir -p "$BIN_DIR"; FORCE_BUILD=1 ensure_bin; ok "updated -> bash run-q6.sh restart" ;;
-  stop)    pkill -f "$PROC" && ok "stopped (port $PORT)" || ok "not running" ;;
-  restart) pkill -f "$PROC" 2>/dev/null; sleep 2; ensure_bin; start_server; info ;;
-  status)  pgrep -af "$PROC" || echo "  not running on port $PORT"
+  stop)    pkill -f llama-server && ok stopped || ok "not running" ;;
+  restart) pkill -f llama-server 2>/dev/null; sleep 2; ensure_bin; start_server; info ;;
+  status)  pgrep -af llama-server || echo "  not running"
            curl -sf "http://127.0.0.1:$PORT/health" >/dev/null && ok "health OK" || echo "  health: down"
            nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader ;;
   log|logs) tail -n 60 -f "$LOG" ;;
