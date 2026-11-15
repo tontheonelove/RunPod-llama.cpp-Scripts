@@ -1,3 +1,7 @@
 # 🦙 รัน Model (GGUF) บน RunPod ด้วย llama.cpp + Web Chat
 
-run.sh will automatic to use
+put file run.sh in workspace 
+
+run 
+#bash runxxxxxx.sh
+#bash runxxxxxxx.sh bench
