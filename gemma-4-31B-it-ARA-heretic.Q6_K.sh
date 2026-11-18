@@ -222,8 +222,8 @@ start_server(){
 
 info(){
   echo; c 32 "──────────────────────────────────────────────"
-  c 32 " API : http://127.0.0.1:$PORT/v1"
-  [ -n "${RUNPOD_POD_ID:-}" ] && c 32 " URL : https://${RUNPOD_POD_ID}-${PORT}.proxy.runpod.net/v1"
+  c 32 " API : http://127.0.0.1:$PORT/"
+  [ -n "${RUNPOD_POD_ID:-}" ] && c 32 " URL : https://${RUNPOD_POD_ID}-${PORT}.proxy.runpod.net/"
   c 32 "──────────────────────────────────────────────"
   nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader 2>/dev/null || true
   cat <<EOF
