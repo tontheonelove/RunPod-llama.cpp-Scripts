@@ -11,7 +11,7 @@ MODEL_FILE="Inkling-2-Mini-Uncensored-AD-Q4_K.gguf"
 MODEL_DIR="/root/models"
 BUILD_DIR="/root/llama.cpp"
 LLAMA_VERSION="v1.1.0"
-CUDA_ARCH="86;89;90"
+CUDA_ARCH="86;89;90"          # A40=86, L40/L40S=89, H100=90 (แก้ให้ตรง GPU เพื่อ build เร็วขึ้น)
 CTX_SIZE="${CTX_SIZE:-32768}"
 N_GPU_LAYERS="${N_GPU_LAYERS:-999}"
 PORT="${PORT:-8080}"
@@ -68,4 +68,4 @@ exec "${BUILD_DIR}/build/bin/llama-server" \
     -b 2048 \
     -ub 512 \
     --threads "$(nproc)" \
-    --no-mmap
+    --load-mode none
