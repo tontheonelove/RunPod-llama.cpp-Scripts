@@ -10,5 +10,5 @@ put file run.sh in workspace
 
 ````
 #chmod +x gemma-4-31B-it-ARA-heretic.Q6_K.sh
-#bash gemma-4-31B-it-ARA-heretic.Q6_K.sh start
+#./gemma-4-31B-it-ARA-heretic.Q6_K.sh
 ````
